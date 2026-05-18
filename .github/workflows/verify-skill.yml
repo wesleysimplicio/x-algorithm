@@ -1,0 +1,33 @@
+name: verify x-virality skill
+
+on:
+  pull_request:
+    paths:
+      - ".claude/skills/x-virality/**"
+      - ".github/workflows/verify-skill.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".claude/skills/x-virality/**"
+      - ".github/workflows/verify-skill.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Verify source references resolve
+        run: python .claude/skills/x-virality/tools/verify_refs.py
+
+      - name: Run pytest (unit + regression)
+        run: pytest .claude/skills/x-virality/tools/tests/ -v

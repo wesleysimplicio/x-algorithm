@@ -118,6 +118,8 @@ Run through `checklist.md` (in this skill folder) before the user posts. If mult
 - `references/algorithm-signals.md` — full signal catalog, every field mapped to a source file.
 - `references/scoring-weights.md` — the weighted score formula, offset, and normalization.
 - `references/filters-and-vf.md` — every filter, what it removes, how to avoid it.
+- `references/recipes/` — copywriting recipe library by target signal (reply-bait shipped; dwell, share, follow-magnet, quote, threads in `ROADMAP.md`).
 - `checklist.md` — pre-publish checklist.
-
-Open issues (sprints) track the rest of the skill build-out — recipes, templates, video playbook, score simulator, multi-agent integrations. See `https://github.com/wesleysimplicio/x-algorithm/issues`.
+- `tools/score_simulator.py` — heuristic weighted-score predictor (mirrors `home-mixer/scorers/ranking_scorer.rs` structure).
+- `tools/verify_refs.py` — CI check that every source path cited in this skill still exists.
+- `ROADMAP.md` — full sprint plan (Sprint 1 done; Sprint 2-6 mapped). Acts as the issue tracker until GitHub Issues is enabled on the repo.
