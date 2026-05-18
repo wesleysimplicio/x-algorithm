@@ -5,11 +5,15 @@ on:
     paths:
       - ".claude/skills/x-virality/**"
       - ".github/workflows/verify-skill.yml"
+      - "AGENTS.md"
+      - "tota.skill.json"
   push:
     branches: [main]
     paths:
       - ".claude/skills/x-virality/**"
       - ".github/workflows/verify-skill.yml"
+      - "AGENTS.md"
+      - "tota.skill.json"
   workflow_dispatch:
 
 jobs:
@@ -28,6 +32,9 @@ jobs:
 
       - name: Verify source references resolve
         run: python .claude/skills/x-virality/tools/verify_refs.py
+
+      - name: Verify generated agent artifacts in sync
+        run: python .claude/skills/x-virality/tools/generate_agents.py --check
 
       - name: Run pytest (unit + regression)
         run: pytest .claude/skills/x-virality/tools/tests/ -v

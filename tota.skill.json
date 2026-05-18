@@ -1,0 +1,41 @@
+{
+  "name": "x-virality",
+  "description": "Use when the user asks to draft, rewrite, or optimize content for X (Twitter) \u2014 single posts, threads, replies, quote posts, or videos \u2014 and wants the work tuned to the X \"For You\" ranking algorithm. Triggers on requests like \"make this go viral on X\", \"post for X algorithm\", \"optimize tweet\", \"X engagement\", \"viralizar no X\". Applies the public X For You source code (this repo) to guide drafts toward signals the algorithm rewards (replies, dwell, shares, follows, qualified video views) and away from signals that suppress reach (not-interested, mute, block, report, VF labels, age decay, author-diversity decay).",
+  "entrypoint": ".claude/skills/x-virality/SKILL.md",
+  "references": [
+    ".claude/skills/x-virality/README.md",
+    ".claude/skills/x-virality/ROADMAP.md",
+    ".claude/skills/x-virality/SKILL.md",
+    ".claude/skills/x-virality/checklist.md",
+    ".claude/skills/x-virality/references/algorithm-signals.md",
+    ".claude/skills/x-virality/references/distribution/mutual-follow.md",
+    ".claude/skills/x-virality/references/distribution/new-user.md",
+    ".claude/skills/x-virality/references/distribution/oon-expansion.md",
+    ".claude/skills/x-virality/references/distribution/premium.md",
+    ".claude/skills/x-virality/references/filters-and-vf.md",
+    ".claude/skills/x-virality/references/multimodal-playbook.md",
+    ".claude/skills/x-virality/references/photo-playbook.md",
+    ".claude/skills/x-virality/references/recipes/dwell.md",
+    ".claude/skills/x-virality/references/recipes/follow-magnet.md",
+    ".claude/skills/x-virality/references/recipes/quote.md",
+    ".claude/skills/x-virality/references/recipes/reply-bait.md",
+    ".claude/skills/x-virality/references/recipes/share.md",
+    ".claude/skills/x-virality/references/recipes/threads.md",
+    ".claude/skills/x-virality/references/risk/cadence.md",
+    ".claude/skills/x-virality/references/risk/freshness.md",
+    ".claude/skills/x-virality/references/risk/spam-and-brand-safety.md",
+    ".claude/skills/x-virality/references/risk/vf-labels.md",
+    ".claude/skills/x-virality/references/scoring-weights.md",
+    ".claude/skills/x-virality/references/video-playbook.md",
+    ".claude/skills/x-virality/tools/README.md"
+  ],
+  "tools": [
+    ".claude/skills/x-virality/tools/score_simulator.py",
+    ".claude/skills/x-virality/tools/verify_refs.py",
+    ".claude/skills/x-virality/tools/checklist_cli.py",
+    ".claude/skills/x-virality/tools/measurement_loop.py"
+  ],
+  "checklist": ".claude/skills/x-virality/checklist.md",
+  "roadmap": ".claude/skills/x-virality/ROADMAP.md",
+  "schema_version": 1
+}
