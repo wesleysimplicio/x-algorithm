@@ -115,11 +115,45 @@ Run through `checklist.md` (in this skill folder) before the user posts. If mult
 
 ## References
 
+### Core
 - `references/algorithm-signals.md` — full signal catalog, every field mapped to a source file.
-- `references/scoring-weights.md` — the weighted score formula, offset, and normalization.
+- `references/scoring-weights.md` — the weighted score formula, offset, normalization.
 - `references/filters-and-vf.md` — every filter, what it removes, how to avoid it.
-- `references/recipes/` — copywriting recipe library by target signal (reply-bait shipped; dwell, share, follow-magnet, quote, threads in `ROADMAP.md`).
 - `checklist.md` — pre-publish checklist.
+- `ROADMAP.md` — full sprint plan (all Sprint 1-6 ✅).
+
+### Recipes (one per target signal)
+- `references/recipes/reply-bait.md` — target: `reply_score`.
+- `references/recipes/dwell.md` — target: `dwell_score` + `dwell_time`.
+- `references/recipes/share.md` — target: `share_via_dm_score` + `share_via_copy_link_score`.
+- `references/recipes/follow-magnet.md` — target: `follow_author_score` (highest leverage).
+- `references/recipes/quote.md` — target: `quote_score` + `quoted_click_score` + `quoted_vqv_score`.
+- `references/recipes/threads.md` — thread structure playbook.
+
+### Media
+- `references/video-playbook.md` — duration buckets + VQV gating.
+- `references/photo-playbook.md` — composition for `photo_expand_score`.
+- `references/multimodal-playbook.md` — text + media alignment for retrieval.
+
+### Distribution
+- `references/distribution/mutual-follow.md` — MinHash Jaccard strategy.
+- `references/distribution/oon-expansion.md` — escape OON penalty.
+- `references/distribution/new-user.md` — new-account window.
+- `references/distribution/premium.md` — X Premium / subscription.
+
+### Risk
+- `references/risk/vf-labels.md` — every VF label, what triggers it.
+- `references/risk/spam-and-brand-safety.md` — spam classifier + `MediumRisk` verdict.
+- `references/risk/cadence.md` — author-diversity decay & posting cadence.
+- `references/risk/freshness.md` — age filter + age buckets + first-hour playbook.
+
+### Tools
 - `tools/score_simulator.py` — heuristic weighted-score predictor (mirrors `home-mixer/scorers/ranking_scorer.rs` structure).
 - `tools/verify_refs.py` — CI check that every source path cited in this skill still exists.
-- `ROADMAP.md` — full sprint plan (Sprint 1 done; Sprint 2-6 mapped). Acts as the issue tracker until GitHub Issues is enabled on the repo.
+- `tools/checklist_cli.py` — interactive walker for `checklist.md`.
+- `tools/generate_agents.py` — regenerates `AGENTS.md` + `tota.skill.json` at repo root from `SKILL.md` frontmatter.
+- `tools/measurement_loop.py` — record predicted vs actual engagement; aggregate drift over many posts.
+
+### Generated install artifacts (at repo root)
+- `AGENTS.md` — Codex / CLI agent entry point.
+- `tota.skill.json` — generic JSON skill manifest (Tota Agent + any agent reading a JSON schema).
