@@ -11,12 +11,21 @@ The skill is **source-grounded**: every claim points back to a file in `home-mix
 ├── SKILL.md                          # Main entry, loaded by the agent
 ├── checklist.md                      # Pre-publish quick check
 ├── README.md                         # (this file) install + scope
+├── ROADMAP.md                        # Full sprint plan (acts as issue tracker)
 ├── references/
 │   ├── algorithm-signals.md          # Every signal, mapped to source
 │   ├── scoring-weights.md            # The weighted-score formula
-│   └── filters-and-vf.md             # What drops reach to zero
+│   ├── filters-and-vf.md             # What drops reach to zero
+│   └── recipes/
+│       └── reply-bait.md             # Recipe library — by target signal
 └── tools/
-    └── (planned — see GitHub issues)
+    ├── README.md
+    ├── verify_refs.py                # CI: every cited source path still exists
+    ├── score_simulator.py            # Heuristic weighted-score predictor
+    └── tests/
+        ├── conftest.py
+        ├── test_verify_refs.py
+        └── test_score_simulator.py
 ```
 
 ## Installing for each agent
@@ -66,9 +75,21 @@ For algorithm changes outside this repo (e.g. live API behavior X.com ships that
 
 ## Roadmap
 
-Tracked as GitHub issues, organized by sprint. See:
-- **Epic**: `[Epic] X Virality Skill — Master Tracker`
-- **Sprint 1**: Foundation (this initial commit)
-- **Sprint 2-6**: Recipes, video playbook, distribution, risk, tooling, multi-agent variants
+GitHub Issues is currently disabled on this repo, so the canonical roadmap lives in `ROADMAP.md` inside this folder. It's structured as one checklist per sprint and is meant to be mirrored to GitHub Issues 1:1 the moment Issues is enabled.
 
-Issue list: `https://github.com/wesleysimplicio/x-algorithm/issues`
+- **Sprint 1** — Foundation ✅ (PR #1)
+- **Sprint 2** — Content recipes & templates 🚧 (reply-bait shipped)
+- **Sprint 3** — Video & multimedia playbook
+- **Sprint 4** — Distribution & network growth
+- **Sprint 5** — Risk & anti-patterns
+- **Sprint 6** — Tooling & multi-agent integrations 🚧 (verify_refs, score_simulator, CI shipped)
+
+## Tests
+
+```bash
+pip install pytest
+python .claude/skills/x-virality/tools/verify_refs.py
+pytest .claude/skills/x-virality/tools/tests/ -v
+```
+
+CI runs both on every PR that touches the skill (`.github/workflows/verify-skill.yml`).
