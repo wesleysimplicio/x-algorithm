@@ -5,13 +5,15 @@ use crate::models::candidate::PostCandidate;
 use crate::models::query::ScoredPostsQuery;
 use crate::params;
 use crate::server::{PipelineOutput, QueryBuilder};
+use crate::side_effects::phoenix_request_cache_side_effect::served_post_score_infos;
+use crate::util::under_the_hood;
 use bytes::Bytes;
 use std::sync::Arc;
 use std::time::Instant;
 use tonic::Status;
 use tracing::info;
 use xai_candidate_pipeline::candidate_pipeline::{CandidatePipeline, PipelineResult};
-use xai_home_mixer_proto::ScoredPost;
+use xai_home_mixer_proto::{ScoredPost, VideoCarouselModule};
 use xai_stats_receiver::global_stats_receiver;
 use xai_x_thrift::tweet_safety_label::SafetyLabelType;
 
@@ -45,7 +47,9 @@ impl ScoredPostsServer {
         if params::TEST_USER_IDS.contains(&query.user_id) {
             return Ok(PipelineOutput {
                 scored_posts: vec![],
+                video_carousel: None,
                 pipeline_result: PipelineResult::empty(),
+                pipeline_trace: None,
             });
         }
 
@@ -53,7 +57,8 @@ impl ScoredPostsServer {
 
         let start = Instant::now();
 
-        let pipeline_result = self.phoenix_candidate_pipeline.execute(query).await;
+        let (pipeline_result, pipeline_trace) =
+            self.phoenix_candidate_pipeline.execute_traced(query).await;
 
         info!(
             "Scored Posts response - request_id {} - {} posts ({} ms)",
@@ -64,17 +69,43 @@ impl ScoredPostsServer {
 
         log_response_stats(&pipeline_result);
 
-        let scored_posts = candidates_to_scored_posts(&pipeline_result.selected_candidates);
-
+        let scored_posts = candidates_to_scored_posts(
+            &pipeline_result.query,
+            &pipeline_result.selected_candidates,
+        );
+        if pipeline_result.query.params.get(params::EnablePageLogging) {
+            let _ = pipeline_result
+                .query
+                .served_post_score_infos
+                .set(served_post_score_infos(
+                    &pipeline_result.query,
+                    &pipeline_result.selected_candidates,
+                ));
+        }
+        let video_carousel = pipeline_result
+            .query
+            .video_carousel
+            .get()
+            .filter(|videos| !videos.is_empty())
+            .map(|videos| VideoCarouselModule {
+                videos: candidates_to_scored_posts(&pipeline_result.query, videos),
+            });
         Ok(PipelineOutput {
             scored_posts,
+            video_carousel,
+            pipeline_trace: pipeline_trace
+                .filter(|_| pipeline_result.query.is_under_the_hood_request)
+                .map(|trace| under_the_hood::pipeline_trace(&trace)),
             pipeline_result,
         })
     }
 }
 
 
-fn candidates_to_scored_posts(candidates: &[PostCandidate]) -> Vec<ScoredPost> {
+fn candidates_to_scored_posts(
+    query: &ScoredPostsQuery,
+    candidates: &[PostCandidate],
+) -> Vec<ScoredPost> {
     candidates
         .iter()
         .map(|candidate| {
@@ -91,6 +122,9 @@ fn candidates_to_scored_posts(candidates: &[PostCandidate]) -> Vec<ScoredPost> {
                 last_scored_timestamp_ms: candidate.last_scored_at_ms.unwrap_or(0),
                 prediction_request_id: candidate.prediction_request_id.unwrap_or(0),
                 ancestors: candidate.ancestors.clone(),
+                tombstone_ancestor_ids: candidate.tombstone_ancestor_ids.clone(),
+                ancestor_users: candidate.ancestor_users.clone(),
+                quoted_user_id: candidate.quoted_user_id.unwrap_or(0),
                 screen_names,
                 visibility_reason: candidate.visibility_reason.clone().map(|r| r.into()),
                 tweet_type_metrics: Bytes::from(
@@ -107,6 +141,19 @@ fn candidates_to_scored_posts(candidates: &[PostCandidate]) -> Vec<ScoredPost> {
                     .filter_map(|l| safety_label_to_proto(l.label_type))
                     .collect(),
                 tweet_text: candidate.tweet_text.clone(),
+                predicted_dwell_sec: candidate
+                    .phoenix_scores
+                    .dwell_time
+                    .filter(|d| d.is_finite() && *d > 0.0)
+                    .map(|d| d as f32),
+                topic_feedback_topic: candidate.topic_feedback_topic.clone(),
+                topic_feedback_topic_id: candidate.topic_feedback_topic_id.clone(),
+                ai_trend_name: candidate.ai_trend_name.clone(),
+                ai_trend_id: candidate.ai_trend_id.clone(),
+                under_the_hood: query
+                    .is_under_the_hood_request
+                    .then(|| under_the_hood::post_scores(query, candidate)),
+                nsfw_author_ads: candidate.nsfw_author_ads.unwrap_or(false),
             }
         })
         .collect()
@@ -209,6 +256,12 @@ fn safety_label_to_proto(label: SafetyLabelType) -> Option<i32> {
         SafetyLabelType::GROK_NSFA_LIMITED => HM::GrokNsfaLimited,
         SafetyLabelType::NSFA_HIGH_RECALL => HM::NsfaHighRecall,
         SafetyLabelType::GROK_SFA => HM::GrokSfa,
+        SafetyLabelType::MALICIOUS_URL => HM::MaliciousUrl,
+        SafetyLabelType::GROK_SFA_V2 => HM::GrokSfaV2,
+        SafetyLabelType::GROK_NSFA_LIMITED_V2 => HM::GrokNsfaLimitedV2,
+        SafetyLabelType::GROK_NSFA_V2 => HM::GrokNsfaV2,
+        SafetyLabelType::GROK_NSFA_EXPANDED_V2 => HM::GrokNsfaExpandedV2,
+        SafetyLabelType::PTOS_REVIEWED => HM::PtosReviewed,
         _ => return None,
     };
     Some(v.into())

@@ -1,10 +1,8 @@
-use crate::candidate_pipeline::{PipelineCandidate, PipelineQuery};
+use crate::candidate_pipeline::{PipelineCandidate, PipelineQuery, PipelineStage};
 use crate::util;
 use std::any::type_name_of_val;
 use std::sync::Arc;
 use tonic::async_trait;
-
-// A side-effect is an action run that doesn't affect the pipeline result from being returned
 
 #[derive(Clone)]
 pub struct SideEffectInput<Q, C> {
@@ -19,13 +17,16 @@ where
     Q: PipelineQuery,
     C: PipelineCandidate,
 {
-    /// Decide if this side-effect should be run
     fn enable(&self, _query: Arc<Q>) -> bool {
         true
     }
 
     #[xai_stats_macro::receive_stats]
-    async fn run(&self, input: Arc<SideEffectInput<Q, C>>) -> Result<(), String> {
+    async fn run(
+        &self,
+        input: Arc<SideEffectInput<Q, C>>,
+        _stage: PipelineStage,
+    ) -> Result<(), String> {
         self.side_effect(input).await
     }
 

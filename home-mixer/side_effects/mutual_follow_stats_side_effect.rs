@@ -7,7 +7,7 @@ use crate::params::{
 use std::sync::Arc;
 use tonic::async_trait;
 use xai_candidate_pipeline::side_effect::{SideEffect, SideEffectInput};
-use xai_stats_receiver::{HistogramBuckets, global_stats_receiver};
+use xai_stats_receiver::{global_stats_receiver, HistogramBuckets};
 
 const METRIC_PREFIX: &str = "MutualFollowJaccard";
 
@@ -34,14 +34,13 @@ impl SideEffect<ScoredPostsQuery, PostCandidate> for MutualFollowStatsSideEffect
 
         let retrieval_cluster: String = input.query.params.get(PhoenixRetrievalInferenceClusterId);
         let moe_enabled: bool = input.query.params.get(EnablePhoenixMOESource);
+        let moe_cluster: String = input
+            .query
+            .params
+            .get(PhoenixRetrievalMOEInferenceClusterId);
 
         let mut scope: Vec<(&str, &str)> = vec![("retrieval_cluster", &retrieval_cluster)];
-        let moe_cluster: String;
         if moe_enabled {
-            moe_cluster = input
-                .query
-                .params
-                .get(PhoenixRetrievalMOEInferenceClusterId);
             scope.push(("moe_cluster", &moe_cluster));
         }
 

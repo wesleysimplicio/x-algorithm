@@ -1,0 +1,190 @@
+# mirrored from GrowthBook dynamic config; last sync 2026-10-20T01:49:10Z
+
+for_entity: user
+
+rules:
+  - id: user_in_allowlist
+    when: user_allowlist.is_allowlisted
+    then:
+      kind: skip
+      reason: user_in_allowlist
+
+  - id: user_not_found
+    when: "!user.present"
+    then:
+      kind: skip
+      reason: user_not_found
+
+
+  - id: high_follower_count
+    # Prod uses a different follower count threshold; this is a mock value to reduce gaming.
+    when: cred.follower_count >= 12.34
+    then:
+      kind: skip
+      reason: high_follower_count
+
+  # Prod uses a different credibility score threshold; this is a mock value to reduce gaming.
+  - id: pagerank_skipped
+    when: >
+      cred.is_high
+      || cred.score >= 12.34
+    then:
+      kind: skip
+      reason: pagerank_skipped
+
+
+  - id: anchor_campaign_suspend
+    when: '"anchor_campaign_suspend" in score.labels'
+    then: { kind: act_suspend_user, perm: false, policy: "PlatformManipulation" }
+  - id: anchor_campaign_user
+    when: '"anchor_campaign_user" in score.labels'
+    then: { kind: act_add_labels_v2, labels: ["SpamHighRecall"] }
+
+  - id: anchor_campaign_suspend_cse
+    when: '"anchor_campaign_suspend_cse" in score.labels'
+    then: { kind: act_suspend_user, perm: true, policy: "Cse" }
+
+  - id: panda_reports_embedding_v10_rough_spam
+    when: '"panda_reports_embedding_v10_rough_spam" in score.labels'
+    then: { kind: act_suspend_user, perm: false, policy: "PlatformManipulation" }
+
+  - id: act_bb1_post_spam_bot_suspend
+    when: '"bb1_post_spam_bot_suspend" in score.labels'
+    then: { kind: act_suspend_user, perm: false, policy: "PlatformManipulation" }
+
+  - id: act_bb1_post_spam_bot_bounce
+    when: '"bb1_post_spam_bot_bounce" in score.labels'
+    then:
+      kind: act_all
+      actions:
+        - kind: act_add_labels_v2
+          labels: ["SpamHighRecall"]
+          ttl_msec: 2592000000
+        - kind: act_spam_liveness_check
+
+  - id: act_bb1_reply_spam_bot_suspend
+    when: '"bb1_reply_spam_bot_suspend" in score.labels'
+    then: { kind: act_suspend_user, perm: false, policy: "PlatformManipulation" }
+
+  - id: act_bb1_reply_spam_bot_bounce
+    when: '"bb1_reply_spam_bot_bounce" in score.labels'
+    then:
+      kind: act_all
+      actions:
+        - kind: act_add_labels_v2
+          labels: ["SpamHighRecall"]
+          ttl_msec: 2592000000
+        - kind: act_spam_liveness_check
+
+  - id: act_bb1_user_suspend
+    when: '"bb1_user_suspend" in score.labels'
+    then: { kind: act_suspend_user, perm: false, policy: "PlatformManipulation" }
+
+  - id: act_liveness_check_and_spam_high_recall_7d
+    when: '"liveness_check_and_spam_high_recall_7d" in score.labels'
+    then:
+      kind: act_all
+      actions:
+        - kind: act_add_labels_v2
+          labels: ["SpamHighRecall"]
+          ttl_msec: 604800000
+        - kind: act_spam_liveness_check
+
+  - id: act_spam_high_recall_7d
+    when: '"spam_high_recall_7d" in score.labels'
+    then:
+      kind: act_add_labels_v2
+      labels: ["SpamHighRecall"]
+      ttl_msec: 604800000
+
+  - id: act_bb1_user_bounce
+    when: '"bb1_user_bounce" in score.labels'
+    then:
+      kind: act_all
+      actions:
+        - kind: act_add_labels_v2
+          labels: ["SpamHighRecall"]
+          ttl_msec: 2592000000
+        - kind: act_spam_liveness_check
+
+
+
+  - id: already_spam_high_recall_labeled_llm_slop
+    when: '"llm_slop_user" in score.labels && "SpamHighRecall" in user.labels'
+    then:
+      kind: skip
+      reason: already_spam_high_recall_labeled
+
+  - id: act_add_llm_slop_label
+    when: '"llm_slop_user" in score.labels'
+    then:
+      kind: act_add_labels_v2
+      labels: ["SpamHighRecall"]
+      ttl_msec: 604800000
+
+  - id: already_spam_high_recall_labeled_majority_poster
+    when: '"SpamEmbeddingMajorityPoster" in score.labels && "SpamHighRecall" in user.labels'
+    then:
+      kind: skip
+      reason: already_spam_high_recall_labeled
+
+  - id: act_add_majority_poster_label
+    when: '"SpamEmbeddingMajorityPoster" in score.labels'
+    then:
+      kind: act_add_labels_v2
+      labels: ["SpamHighRecall"]
+      ttl_msec: 2592000000
+
+
+  - id: act_spam_liveness_check
+    when: '"spam_liveness_check_required" in score.labels'
+    then:
+      kind: act_spam_liveness_check
+
+  - id: already_suspended
+    when: user.suspended
+    then:
+      kind: skip
+      reason: already_suspended
+
+  - id: already_deactivated
+    when: user.deactivated
+    then:
+      kind: skip
+      reason: already_deactivated
+
+  - id: act_cusp_arkose
+    when: >
+      "enforcement_cusp_arkose" in score.labels
+      && !("enforcement_threshold_reached" in score.labels)
+    then:
+      kind: act_arkose
+
+  - id: act_cusp_captcha
+    when: >
+      "enforcement_cusp_captcha" in score.labels
+      && !("enforcement_threshold_reached" in score.labels)
+    then:
+      kind: act_captcha
+
+  - id: act_cusp_liveness
+    when: >
+      "enforcement_cusp_liveness" in score.labels
+      && !("enforcement_threshold_reached" in score.labels)
+    then:
+      kind: act_spam_liveness_check
+
+  - id: act_impersonation_scam_suspend
+    when: '"impersonation_scam_classifier_v1_suspend" in score.labels'
+    then:
+      kind: act_suspend_user
+      perm: false
+      policy: PlatformManipulation
+
+  - id: act_suspend
+    when: "true"
+    then:
+      kind: act_suspend_user
+      perm: false
+      policy: PlatformManipulation
+

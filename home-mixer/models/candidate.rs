@@ -1,8 +1,13 @@
 use crate::models::brand_safety::BrandSafetyVerdict;
+use crate::models::content_features;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
+use xai_candidate_pipeline::component_library::clients::phoenix_retrieval_client::PhoenixRetrievalCluster;
 pub use xai_candidate_pipeline::component_library::models::PhoenixScores;
 use xai_home_mixer_proto as pb;
+use xai_proto::engagement_counter::PostEngagers;
+use xai_recsys_proto::SAFETY_BIT_AUTHOR_NSFW;
 use xai_visibility_filtering::models as vf;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -20,18 +25,67 @@ pub struct PostCandidate {
     pub last_scored_at_ms: Option<u64>,
     pub weighted_score: Option<f64>,
     pub score: Option<f64>,
+    #[serde(default)]
+    pub cold_start_lift_to_rank: Option<u32>,
+    pub slate_context: Option<SlateContext>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub top_heads: Vec<(String, f64, f64)>,
+    #[serde(default)]
+    pub served_slate_context: Option<SlateContext>,
+    #[serde(default)]
+    pub reranker_head_tag: Option<u32>,
+    #[serde(default)]
+    pub page_decode_slot: Option<u32>,
+    #[serde(default)]
+    pub page_decode_prob: Option<f64>,
+    #[serde(default)]
+    pub page_rl_exploration_prob: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backbone_scores: Option<PhoenixScores>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub immersive_scores: Option<PhoenixScores>,
+    #[serde(skip)]
+    pub video_embedding: Option<Vec<f32>>,
     #[serde(
         serialize_with = "serialize_served_type",
         deserialize_with = "deserialize_served_type"
     )]
     pub served_type: Option<pb::ServedType>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub retrieval_sources: Vec<RetrievalSource>,
     pub in_network: Option<bool>,
     pub ancestors: Vec<u64>,
+    pub tombstone_ancestor_ids: Vec<u64>,
+    pub ancestor_users: Vec<u64>,
+    #[serde(default)]
+    pub conversation_id: Option<u64>,
+    pub ancestor_texts: HashMap<u64, String>,
+    #[serde(default)]
+    pub ancestor_has_video: Option<bool>,
+    pub quoted_tweet_text: Option<String>,
     pub min_video_duration_ms: Option<i32>,
+    pub max_video_duration_ms: Option<i32>,
+    pub has_photo: Option<bool>,
+    pub has_video: Option<bool>,
+    #[serde(default)]
+    pub video_aspect_ratio: Option<f32>,
+    #[serde(default)]
+    pub video_media_id: Option<u64>,
+    #[serde(default)]
+    pub video_md5_hashes: Option<Vec<String>>,
+    #[serde(default)]
+    pub video_carousel_extra: bool,
+    pub media_count: Option<i32>,
     pub quoted_video_duration_ms: Option<i32>,
+    pub quoted_has_media: Option<bool>,
+    pub quoted_has_photo: Option<bool>,
+    pub quoted_has_video: Option<bool>,
+    pub quoted_media_count: Option<i32>,
+    pub quoted_max_video_duration_ms: Option<i32>,
     pub author_followers_count: Option<i32>,
     pub author_screen_name: Option<String>,
     pub retweeted_screen_name: Option<String>,
+    pub visibility_action: Option<vf::Action>,
     pub visibility_reason: Option<vf::FilteredReason>,
     pub drop_ancillary_posts: Option<bool>,
     pub subscription_author_id: Option<u64>,
@@ -43,15 +97,110 @@ pub struct PostCandidate {
     #[serde(default)]
     pub following_replied_user_ids: Vec<u64>,
     pub has_media: Option<bool>,
+    pub broadcast_is_live: Option<bool>,
     pub language_code: Option<String>,
     pub fav_count: Option<i64>,
     pub reply_count: Option<i64>,
     pub repost_count: Option<i64>,
     pub quote_count: Option<i64>,
+    pub view_count: Option<u64>,
+    #[serde(default)]
+    pub view_count_on_home: Option<u64>,
+    pub bookmark_count: Option<i64>,
     pub mutual_follow_jaccard: Option<f64>,
+    pub is_mutual_follow_author: Option<bool>,
+    pub author_follows_viewer: Option<bool>,
     pub brand_safety_verdict: Option<BrandSafetyVerdict>,
+    pub nsfw_author: Option<bool>,
+    pub nsfw_author_ads: Option<bool>,
+    pub nsfw_author_phoenix: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub soft_nsfw: Option<bool>,
     #[serde(default)]
     pub safety_labels: Vec<SafetyLabelInfo>,
+    #[serde(default)]
+    pub semantic_ids: Option<Vec<i32>>,
+    pub topic_feedback_topic: Option<String>,
+    pub topic_feedback_topic_id: Option<String>,
+    pub grok_topics: Option<Vec<String>>,
+    pub ai_trend_name: Option<String>,
+    pub ai_trend_id: Option<String>,
+    #[serde(skip)]
+    pub post_engagers: Option<Arc<PostEngagers>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RetrievalSource {
+    #[serde(
+        serialize_with = "serialize_served_type_value",
+        deserialize_with = "deserialize_served_type_value"
+    )]
+    pub served_type: pb::ServedType,
+    pub cluster: Option<PhoenixRetrievalCluster>,
+    pub score: Option<f32>,
+    pub position: Option<u32>,
+}
+
+impl RetrievalSource {
+    pub fn from_served_type(served_type: pb::ServedType) -> Self {
+        Self {
+            served_type,
+            cluster: None,
+            score: None,
+            position: None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SlateContext {
+    pub k: u32,
+    pub pool_rank: u32,
+    pub pool_rank_gap: Option<u32>,
+    pub fatigue: f64,
+    pub pre_diversity_score: f64,
+    pub sid_known: bool,
+    pub sid_k_l1: u32,
+    pub sid_k_l2: u32,
+    pub sid_k_l3: u32,
+    pub sid_gap_l1: Option<u32>,
+    pub sid_gap_l2: Option<u32>,
+    pub sid_gap_l3: Option<u32>,
+    #[serde(default)]
+    pub recon_cos_milli: Option<u32>,
+    #[serde(default)]
+    pub recon_count_above: Option<u32>,
+    #[serde(default)]
+    pub recon_gap_above: Option<u32>,
+    #[serde(default)]
+    pub exact_k: Option<u32>,
+    #[serde(default)]
+    pub exact_gap: Option<u32>,
+}
+
+impl From<xai_recsys_proto::SlateContext> for SlateContext {
+    fn from(c: xai_recsys_proto::SlateContext) -> Self {
+        Self {
+            k: c.k,
+            pool_rank: c.pool_rank,
+            pool_rank_gap: c.pool_rank_gap,
+            fatigue: c.fatigue,
+            pre_diversity_score: c.pre_diversity_score,
+            sid_known: c.sid_known,
+            sid_k_l1: c.sid_k1,
+            sid_k_l2: c.sid_k2,
+            sid_k_l3: c.sid_k3,
+            sid_gap_l1: c.sid_gap1,
+            sid_gap_l2: c.sid_gap2,
+            sid_gap_l3: c.sid_gap3,
+            recon_cos_milli: c.recon_cos_milli,
+            recon_count_above: c.recon_count_above,
+            recon_gap_above: c.recon_gap_above,
+            exact_k: c.exact_k,
+            exact_gap: c.exact_gap,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -85,11 +234,31 @@ where
     }
 }
 
+fn serialize_served_type_value<S>(
+    served_type: &pb::ServedType,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    (*served_type as i32).serialize(serializer)
+}
+
+fn deserialize_served_type_value<'de, D>(deserializer: D) -> Result<pb::ServedType, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    pb::ServedType::try_from(i32::deserialize(deserializer)?)
+        .map_err(|_| serde::de::Error::custom("invalid ServedType value"))
+}
+
 pub trait CandidateHelpers {
     fn get_screen_names(&self) -> HashMap<u64, String>;
     fn get_original_tweet_id(&self) -> u64;
     fn get_original_author_id(&self) -> u64;
+    fn semantic_id_prefix(&self, levels: usize) -> Option<&[i32]>;
     fn as_tweet_info(&self, is_followed_by_viewer: bool) -> xai_recsys_proto::TweetInfo;
+    fn as_score_info_no_prediction_scores(&self) -> xai_recsys_proto::ScoreInfo;
 }
 
 impl CandidateHelpers for PostCandidate {
@@ -114,6 +283,46 @@ impl CandidateHelpers for PostCandidate {
         self.retweeted_user_id.unwrap_or(self.author_id)
     }
 
+    fn semantic_id_prefix(&self, levels: usize) -> Option<&[i32]> {
+        self.semantic_ids
+            .as_deref()
+            .filter(|codes| codes.len() >= levels && levels > 0)
+            .map(|codes| &codes[..levels])
+    }
+
+    fn as_score_info_no_prediction_scores(&self) -> xai_recsys_proto::ScoreInfo {
+        xai_recsys_proto::ScoreInfo {
+            prediction_scores: Default::default(),
+            weighted_score: self.weighted_score,
+            final_score: self.score,
+            slate_context: self.slate_context.map(|c| xai_recsys_proto::SlateContext {
+                k: c.k,
+                pool_rank: c.pool_rank,
+                pool_rank_gap: c.pool_rank_gap,
+                fatigue: c.fatigue,
+                pre_diversity_score: c.pre_diversity_score,
+                sid_known: c.sid_known,
+                sid_k1: c.sid_k_l1,
+                sid_k2: c.sid_k_l2,
+                sid_k3: c.sid_k_l3,
+                sid_gap1: c.sid_gap_l1,
+                sid_gap2: c.sid_gap_l2,
+                sid_gap3: c.sid_gap_l3,
+                recon_cos_milli: c.recon_cos_milli,
+                recon_count_above: c.recon_count_above,
+                recon_gap_above: c.recon_gap_above,
+                exact_k: c.exact_k,
+                exact_gap: c.exact_gap,
+            }),
+            reward_rerank_slot_prob: None,
+            page_decode_slot_prob: None,
+            reranker_head_tag: self.reranker_head_tag,
+            prediction_heads: Vec::new(),
+            prediction_values: Vec::new(),
+            page_decoded: None,
+        }
+    }
+
     fn as_tweet_info(&self, is_followed_by_viewer: bool) -> xai_recsys_proto::TweetInfo {
         xai_recsys_proto::TweetInfo {
             tweet_id: self.get_original_tweet_id(),
@@ -132,11 +341,20 @@ impl CandidateHelpers for PostCandidate {
             quoted_author_id: self.quoted_user_id.unwrap_or(0),
             in_reply_to_tweet_id: self.in_reply_to_tweet_id.unwrap_or(0),
             is_author_followed_by_user: is_followed_by_viewer,
+            safety_label_mask: if self.retweeted_user_id.is_none()
+                && self.nsfw_author_phoenix.unwrap_or(false)
+            {
+                SAFETY_BIT_AUTHOR_NSFW
+            } else {
+                0
+            },
             min_video_duration_ms: self.min_video_duration_ms.map(|ms| ms as u64).unwrap_or(0),
             fav_count: self.fav_count.unwrap_or(0) as u64,
             retweet_count: self.repost_count.unwrap_or(0) as u64,
             quote_count: self.quote_count.unwrap_or(0) as u64,
             reply_count: self.reply_count.unwrap_or(0) as u64,
+            view_count: self.view_count.unwrap_or(0),
+            bookmark_count: self.bookmark_count.unwrap_or(0) as u64,
             language_code: xai_recsys_proto::language_code_string_to_enum(
                 self.language_code.as_deref().unwrap_or(""),
             ) as i32,
@@ -147,7 +365,140 @@ impl CandidateHelpers for PostCandidate {
                 is_reply: self.in_reply_to_tweet_id.is_some(),
                 ..Default::default()
             }),
+            author_info: Some(xai_recsys_proto::AuthorInfo {
+                author_id: self.get_original_author_id(),
+                is_followed_by_user: is_followed_by_viewer,
+                is_following_user: if self.retweeted_user_id.is_none() {
+                    self.author_follows_viewer
+                } else {
+                    None
+                },
+                followers: if self.retweeted_user_id.is_none() {
+                    self.author_followers_count.map(|c| c.max(0) as u64)
+                } else {
+                    None
+                },
+            }),
+            semantic_ids: self.semantic_ids.clone().unwrap_or_default(),
+            content_features: Some(content_features::build(self)),
+            quoted_content_features: content_features::build_quoted(self),
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn safety_label_info_serde_roundtrip() {
+        use xai_x_thrift::tweet_safety_label::SafetyLabelType;
+
+        let info = SafetyLabelInfo {
+            label_type: SafetyLabelType::NSFW_HIGH_PRECISION,
+            description: Some("test desc".to_string()),
+            source: Some("Content".to_string()),
+        };
+
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"label_type\":3"), "got: {json}");
+
+        let deserialized: SafetyLabelInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            deserialized.label_type,
+            SafetyLabelType::NSFW_HIGH_PRECISION
+        );
+        assert_eq!(deserialized.description, Some("test desc".to_string()));
+        assert_eq!(deserialized.source, Some("Content".to_string()));
+    }
+
+    #[test]
+    fn safety_label_info_deserializes_from_i32() {
+        use xai_x_thrift::tweet_safety_label::SafetyLabelType;
+
+        let json = r#"{"label_type":1,"description":null,"source":null}"#;
+        let info: SafetyLabelInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.label_type, SafetyLabelType::SPAM);
+    }
+
+    #[test]
+    fn post_candidate_deserializes_without_slate_context_field() {
+        let mut value = serde_json::to_value(PostCandidate::default()).unwrap();
+        let obj = value.as_object_mut().unwrap();
+        obj.remove("slate_context");
+        for field in [
+            "has_photo",
+            "has_video",
+            "media_count",
+            "max_video_duration_ms",
+            "quoted_has_media",
+            "quoted_has_photo",
+            "quoted_has_video",
+            "quoted_media_count",
+            "quoted_max_video_duration_ms",
+        ] {
+            obj.remove(field);
+        }
+        obj.insert(
+            "field_from_newer_build".to_string(),
+            serde_json::json!(true),
+        );
+
+        let candidate: PostCandidate = serde_json::from_value(value).unwrap();
+        assert_eq!(candidate.slate_context, None);
+        assert_eq!(candidate.has_video, None);
+        assert_eq!(candidate.media_count, None);
+    }
+
+    #[test]
+    fn post_candidate_deserializes_cache_entries_without_page_rl_fields() {
+        let mut value = serde_json::to_value(PostCandidate {
+            tweet_id: 9,
+            page_decode_slot: Some(1),
+            page_decode_prob: Some(0.5),
+            page_rl_exploration_prob: Some(0.25),
+            ..Default::default()
+        })
+        .unwrap();
+        let obj = value.as_object_mut().unwrap();
+        for field in [
+            "page_decode_slot",
+            "page_decode_prob",
+            "page_rl_exploration_prob",
+        ] {
+            assert!(obj.remove(field).is_some(), "{field} must be serialized");
+        }
+
+        let candidate: PostCandidate = serde_json::from_value(value).unwrap();
+
+        assert_eq!(candidate.tweet_id, 9);
+        assert_eq!(candidate.page_decode_slot, None);
+        assert_eq!(candidate.page_decode_prob, None);
+        assert_eq!(candidate.page_rl_exploration_prob, None);
+    }
+
+    #[test]
+    fn post_candidate_with_safety_labels_roundtrip() {
+        use xai_x_thrift::tweet_safety_label::SafetyLabelType;
+
+        let candidate = PostCandidate {
+            tweet_id: 123,
+            author_id: 456,
+            safety_labels: vec![SafetyLabelInfo {
+                label_type: SafetyLabelType::BOUNCE,
+                description: None,
+                source: None,
+            }],
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&candidate).unwrap();
+        let deserialized: PostCandidate = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.safety_labels.len(), 1);
+        assert_eq!(
+            deserialized.safety_labels[0].label_type,
+            SafetyLabelType::BOUNCE
+        );
     }
 }
